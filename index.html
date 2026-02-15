@@ -1,0 +1,1897 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS | V9.0 The Architect</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100;200;300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        :root {
+            /* Theme Variables */
+            --bg-deep: #000000;
+            --bg-panel: rgba(10, 10, 10, 0.75);
+            --primary: #00f0ff;
+            --secondary: #7000ff;
+            --danger: #ff0055;
+            --success: #00ff88;
+            --text-main: #e0e0e0;
+            --text-dim: #606060;
+            --border: rgba(0, 240, 255, 0.3);
+            --glass: blur(12px);
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        /* Base Styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            outline: none;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            transition: background-color 0.5s;
+            cursor: crosshair;
+            perspective: 1000px;
+        }
+
+        /* Backgrounds */
+        #neural-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            opacity: 1;
+            transition: opacity 1s;
+        }
+
+        #visualizer-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 120px;
+            z-index: -1;
+            opacity: 0.4;
+            pointer-events: none;
+            transition: all 1s;
+        }
+
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0.1));
+            background-size: 100% 3px;
+            pointer-events: none;
+            z-index: 999;
+            opacity: 0.2;
+        }
+
+        /* HUD */
+        .hud-container {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            height: 100vh;
+            padding: 1.5rem;
+            position: relative;
+            z-index: 10;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+
+        .hud-container>* {
+            pointer-events: auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+        }
+
+        .logo {
+            font-weight: 800;
+            letter-spacing: 2px;
+        }
+
+        .clock {
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-shadow: 0 0 15px var(--primary);
+        }
+
+        .system-ops {
+            display: flex;
+            gap: 1rem;
+        }
+
+        /* Main Area */
+        main {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 2rem;
+            position: relative;
+        }
+
+        .command-wrapper {
+            position: relative;
+            width: 600px;
+            max-width: 90vw;
+        }
+
+        .cmd-prefix {
+            position: absolute;
+            left: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        #cmd-input {
+            width: 100%;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            padding: 1.5rem 1.5rem 1.5rem 3rem;
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            font-size: 1.2rem;
+            border-radius: 4px;
+            backdrop-filter: var(--glass);
+            transition: 0.3s;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            background: rgba(10, 10, 10, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        #cmd-input:focus {
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.3);
+            border-color: var(--primary);
+            transform: scale(1.02);
+        }
+
+        /* Dynamic Grid */
+        .grid-links {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+        }
+
+        .link-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: 0.3s;
+            text-decoration: none;
+            color: var(--text-main);
+            width: 110px;
+            transform-style: preserve-3d;
+        }
+
+        .link-card:hover {
+            background: rgba(0, 240, 255, 0.15);
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            box-shadow: 0 0 15px var(--border);
+        }
+
+        .link-card i {
+            font-size: 1.8rem;
+            color: var(--primary);
+            transition: 0.3s;
+        }
+
+        .link-card:hover i {
+            transform: scale(1.2);
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        /* Panels */
+        .panel {
+            position: absolute;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            padding: 1rem;
+            border-radius: 4px;
+            backdrop-filter: var(--glass);
+            transition: transform 0.1s linear;
+            display: block;
+            transform-style: preserve-3d;
+            will-change: transform;
+        }
+
+        .panel h3 {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            margin-bottom: 0.8rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 0.5rem;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .weather-panel {
+            top: 6rem;
+            right: 2rem;
+            width: 250px;
+        }
+
+        .focus-panel {
+            bottom: 20rem;
+            left: 2rem;
+            width: 300px;
+        }
+
+        .audio-panel {
+            bottom: 4rem;
+            left: 2rem;
+            width: 360px;
+        }
+
+        .metrics-panel {
+            top: 18rem;
+            right: 2rem;
+            width: 250px;
+            display: none;
+        }
+
+        /* Buttons & Inputs */
+        .btn-small {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 0.3rem 0.8rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: 0.2s;
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+        }
+
+        .btn-small:hover {
+            background: var(--border);
+            color: #fff;
+            box-shadow: 0 0 10px var(--border);
+        }
+
+        /* Audio Playlist */
+        .playlist {
+            max-height: 120px;
+            overflow-y: auto;
+            margin-top: 0.8rem;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            border: 1px solid #333;
+            padding: 0.5rem;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .playlist::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .playlist::-webkit-scrollbar-thumb {
+            background: var(--primary);
+        }
+
+        .track-item {
+            cursor: pointer;
+            padding: 3px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .track-item:hover {
+            color: var(--primary);
+            padding-left: 5px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .track-item.active {
+            color: var(--success);
+            font-weight: bold;
+            border-left: 2px solid var(--success);
+            padding-left: 5px;
+        }
+
+        .track-rm {
+            color: var(--danger);
+            font-size: 0.9rem;
+            padding: 5px;
+            opacity: 1;
+            transition: 0.2s;
+            cursor: pointer;
+            z-index: 100;
+        }
+
+        .track-item:hover .track-rm {
+            color: #ff4444;
+        }
+
+        .track-item:hover .track-rm {
+            opacity: 1;
+        }
+
+        .eq-controls {
+            display: flex;
+            gap: 0.8rem;
+            margin-top: 0.8rem;
+            align-items: center;
+            font-size: 0.7rem;
+            justify-content: space-between;
+        }
+
+        input[type=range] {
+            width: 100%;
+            height: 2px;
+            accent-color: var(--primary);
+            background: #333;
+        }
+
+        /* Kanban Board */
+        .kanban-board {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .kanban-col {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 0.5rem;
+            border: 1px solid #333;
+            min-height: 200px;
+        }
+
+        .kanban-col h4 {
+            font-size: 0.8rem;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            text-align: center;
+            text-transform: uppercase;
+            border-bottom: 1px solid #333;
+            padding-bottom: 0.2rem;
+        }
+
+        .k-task {
+            background: #111;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+            border-left: 2px solid var(--text-dim);
+            cursor: grab;
+            user-select: none;
+            position: relative;
+        }
+
+        .k-task:hover {
+            border-color: var(--primary);
+            background: #222;
+        }
+
+        .k-del {
+            position: absolute;
+            right: 5px;
+            top: 5px;
+            color: var(--danger);
+            cursor: pointer;
+            display: none;
+            z-index: 100;
+            font-size: 0.9rem;
+            padding: 2px;
+        }
+
+        .k-task:hover .k-del {
+            display: block;
+            background: #000;
+        }
+
+        .k-task:hover .k-del {
+            display: block;
+        }
+
+        /* Memory Core (Draggable) */
+        #memory-core {
+            position: absolute;
+            top: 15%;
+            right: 5%;
+            width: 260px;
+            background: rgba(255, 235, 167, 0.05);
+            border: 1px solid rgba(255, 235, 167, 0.3);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            cursor: grab;
+            z-index: 100;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+            user-select: none;
+        }
+
+        #memory-core:active {
+            cursor: grabbing;
+            border-color: var(--primary);
+        }
+
+        .memory-header {
+            padding: 0.6rem;
+            background: rgba(255, 235, 167, 0.1);
+            font-size: 0.75rem;
+            color: #ffeba7;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+            letter-spacing: 1px;
+            pointer-events: none;
+        }
+
+        #memory-content {
+            width: 100%;
+            height: 250px;
+            background: transparent;
+            border: none;
+            color: #ffeba7;
+            padding: 1rem;
+            font-family: var(--font-mono);
+            resize: none;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* Ticker */
+        .ticker-wrap {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            border-top: 1px solid var(--border);
+            overflow: hidden;
+            height: 32px;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            pointer-events: auto;
+        }
+
+        .ticker {
+            display: inline-block;
+            white-space: nowrap;
+            padding-left: 100%;
+            animation: ticker 40s linear infinite;
+        }
+
+        .ticker-item {
+            display: inline-block;
+            padding: 0 2rem;
+            font-size: 0.85rem;
+            color: var(--primary);
+            letter-spacing: 1px;
+        }
+
+        @keyframes ticker {
+            0% {
+                transform: translate3d(0, 0, 0);
+            }
+
+            100% {
+                transform: translate3d(-100%, 0, 0);
+            }
+        }
+
+        /* Modals */
+        #modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 3000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(8px);
+            pointer-events: auto;
+        }
+
+        .modal {
+            background: #050505;
+            border: 1px solid var(--primary);
+            padding: 2rem;
+            width: 600px;
+            box-shadow: 0 0 50px rgba(0, 240, 255, 0.15);
+            position: relative;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal h2 {
+            margin-bottom: 1rem;
+            color: var(--primary);
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            cursor: pointer;
+            color: var(--danger);
+            font-size: 1.5rem;
+        }
+
+        /* Game Overlay */
+        #game-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 4000;
+            display: none;
+            pointer-events: auto;
+        }
+
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #game-ui {
+            position: absolute;
+            top: 2rem;
+            left: 2rem;
+            color: #0f0;
+            font-family: monospace;
+        }
+
+        /* Voice Status */
+        #voice-status {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--primary);
+            padding: 0.5rem 1.5rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            display: none;
+            animation: pulse-voice 1.5s infinite;
+            letter-spacing: 2px;
+            z-index: 5000;
+        }
+
+        @keyframes pulse-voice {
+            0% {
+                box-shadow: 0 0 5px var(--primary);
+            }
+
+            50% {
+                box-shadow: 0 0 20px var(--primary);
+            }
+
+            100% {
+                box-shadow: 0 0 5px var(--primary);
+            }
+        }
+
+        /* Resource Graph */
+        #res-canvas {
+            width: 100%;
+            height: 100px;
+            margin-top: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #333;
+        }
+
+
+        /* Command Hints Bar */
+        .cmd-hints {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .cmd-hint {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: var(--font-mono);
+            border: 1px solid var(--border);
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Quick Access Dock */
+        .social-dock {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .social-icon {
+            font-size: 1.5rem;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: 0.3s;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid transparent;
+        }
+
+        .social-icon:hover {
+            color: #fff;
+            background: var(--primary);
+            box-shadow: 0 0 15px var(--primary);
+            transform: translateY(-3px);
+            border-color: var(--primary);
+        }
+
+        .cmd-hint {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: var(--font-mono);
+            border: 1px solid transparent;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .cmd-hint:hover {
+            color: var(--primary);
+            border-color: var(--primary);
+            background: rgba(0, 240, 255, 0.1);
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        /* Arcade Overlay */
+        #arcade-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 4000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .arcade-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            max-width: 800px;
+            width: 90%;
+        }
+
+        .game-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .game-card:hover {
+            transform: scale(1.05);
+            background: var(--primary);
+            color: #000;
+            box-shadow: 0 0 20px var(--primary);
+        }
+
+        .game-card i {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .game-card h4 {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        #game-stage {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 4001;
+            display: none;
+        }
+
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #game-ui-layer {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            font-family: monospace;
+            color: #0f0;
+            pointer-events: none;
+            z-index: 4002;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="scanlines"></div>
+    <div id="voice-status">LISTENING ///</div>
+    <canvas id="neural-canvas"></canvas>
+    <canvas id="visualizer-canvas"></canvas>
+
+    <div class="hud-container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-circle-nodes" style="color:var(--primary)"></i> NEXUS <span
+                    style="font-size:0.7rem; color:var(--text-dim)">V9.0</span>
+            </div>
+            <div class="clock" id="clock">00:00:00</div>
+            <div class="system-ops">
+                <button class="btn-small" onclick="openKanban()">PROJECTS</button>
+                <button class="btn-small" onclick="openAppStore()"><i class="fas fa-th-large"></i> MODULES</button>
+                <button class="btn-small" onclick="openHelp()">COMMANDS</button>
+            </div>
+        </header>
+
+        <main>
+            <div class="command-wrapper">
+                <span class="cmd-prefix">>></span>
+                <input type="text" id="cmd-input" placeholder="Query or Command..." autofocus>
+                <i class="fas fa-microphone" id="mic-btn" onclick="toggleVoice()"
+                    style="position:absolute; right:1.5rem; top:50%; transform:translateY(-50%); color:var(--text-dim); cursor:pointer; font-size:1.2rem; transition:0.3s"></i>
+            </div>
+            <div class="cmd-hints">
+                <div class="cmd-hint" onclick="execCmd('/help')">/HELP</div>
+                <div class="cmd-hint" onclick="execCmd('/game')">/ARCADE</div>
+                <div class="cmd-hint" onclick="execCmd('open projects')">PROJECTS</div>
+                <div class="cmd-hint" onclick="execCmd('play music')">AUDIO</div>
+                <div class="cmd-hint" onclick="execCmd('timer 25')">FOCUS</div>
+                <div class="cmd-hint" onclick="execCmd('backup system')">BACKUP</div>
+                <div class="cmd-hint" onclick="execCmd('fullscreen')">FULLSCREEN</div>
+                <div class="cmd-hint" onclick="execCmd('mute')">MUTE</div>
+                <div class="cmd-hint" onclick="execCmd('date')">DATE</div>
+                <div class="cmd-hint" onclick="execCmd('reload')">REBOOT</div>
+            </div>
+
+            <div id="sys-log"
+                style="position:fixed; bottom:120px; left:50%; transform:translateX(-50%); width:600px; max-width:90vw; text-align:center; font-family:monospace; color:var(--primary); font-size:0.9rem; text-shadow:0 0 5px var(--primary); pointer-events:none; z-index:90;">
+                <span id="log-text"></span><span class="cursor-blink">_</span>
+            </div>
+
+            <style>
+                .cursor-blink {
+                    animation: blink 1s step-end infinite;
+                }
+
+                @keyframes blink {
+                    50% {
+                        opacity: 0;
+                    }
+                }
+            </style>
+
+            <div class="social-dock">
+                <a href="https://google.com" target="_blank" class="social-icon"><i class="fab fa-google"></i></a>
+                <a href="https://youtube.com" target="_blank" class="social-icon"><i class="fab fa-youtube"></i></a>
+                <a href="https://instagram.com" target="_blank" class="social-icon"><i class="fab fa-instagram"></i></a>
+                <a href="https://linkedin.com" target="_blank" class="social-icon"><i class="fab fa-linkedin"></i></a>
+                <a href="https://github.com" target="_blank" class="social-icon"><i class="fab fa-github"></i></a>
+                <a href="https://leetcode.com" target="_blank" class="social-icon"><i class="fas fa-code"></i></a>
+            </div>
+            <div id="links-container" class="grid-links"></div>
+            <button class="edit-links-btn"
+                style="background:none; border:none; color:var(--text-dim); font-size:0.7rem; cursor:pointer; margin-top:1rem;"
+                onclick="openLinkEditor()">[ CONFIGURE NODES ]</button>
+        </main>
+
+        <!-- Widgets -->
+        <div id="widget-weather" class="panel weather-panel">
+            <h3>Environment <span><i class="fas fa-cloud"></i></span></h3>
+            <div class="weather-data">
+                <div class="temp-large" id="weather-temp">--°</div>
+                <div class="weather-info">
+                    <div id="weather-desc">ANALYZING...</div>
+                    <div id="weather-loc">SECTOR NULL</div>
+                </div>
+            </div>
+        </div>
+
+
+        <div id="widget-metrics" class="panel metrics-panel">
+            <h3>Bio-Metrics <span><i class="fas fa-microchip"></i></span></h3>
+            <div style="font-size:0.8rem; display:flex; justify-content:space-between;">
+                <span>CPU: <b id="cpu-val">12%</b></span>
+                <span>RAM: <b id="ram-val">4.2GB</b></span>
+            </div>
+            <canvas id="res-canvas"></canvas>
+        </div>
+
+        <div id="widget-focus" class="panel focus-panel">
+            <h3>Focus Protocol <span><i class="fas fa-clock"></i></span></h3>
+            <div class="timer-display" id="timer">25:00</div>
+            <div class="timer-controls">
+                <button class="btn-small" onclick="startTimer(25)">25m</button>
+                <button class="btn-small" onclick="startTimer(5)">5m</button>
+                <button class="btn-small"
+                    onclick="startTimer(document.getElementById('custom-time').value)">SET</button>
+                <button class="btn-small" style="color:var(--danger)" onclick="resetTimer()">RST</button>
+            </div>
+            <input type="number" id="custom-time" placeholder="Min"
+                style="width:100%; background:#222; border:1px solid #444; color:#fff; margin-top:5px; padding:2px;">
+        </div>
+
+        <div id="widget-audio" class="panel audio-panel">
+            <h3>Audio Core <span><i class="fas fa-music"></i></span></h3>
+            <div class="audio-controls">
+                <button class="btn-small" onclick="document.getElementById('audio-file-input').click()">LOAD
+                    SOURCE</button>
+                <button class="btn-small" onclick="togglePlay()"><i class="fas fa-play" id="play-icon"></i></button>
+            </div>
+            <input type="file" id="audio-file-input" multiple accept="audio/*" style="display:none">
+            <div class="playlist" id="playlist">
+                <div style="font-style:italic; opacity:0.5; padding:5px;">System: No Data</div>
+            </div>
+            <div class="eq-controls">
+                <span>LOW</span> <input type="range" min="-10" max="10" step="1" value="0"
+                    oninput="setBass(this.value)">
+                <span>MID</span> <input type="range" min="-10" max="10" step="1" value="0" oninput="setMid(this.value)">
+                <span>VOL</span> <input type="range" min="0" max="1" step="0.1" value="0.5"
+                    oninput="setVolume(this.value)">
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Persistent Widgets (Moveable) -->
+    <div id="memory-core">
+        <div class="memory-header"><span>Cortex Memory</span><i class="fas fa-grip-lines"></i></div>
+        <textarea id="memory-content" placeholder="Awaiting Input..."></textarea>
+    </div>
+
+
+
+    <div class="ticker-wrap" id="widget-ticker">
+        <div class="ticker" id="ticker-content"></div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay">
+        <div class="modal" id="modal-content-area"></div>
+    </div>
+
+    <!-- Arcade Overlay -->
+    <div id="arcade-overlay">
+        <h2
+            style="color:var(--primary); margin-bottom:2rem; letter-spacing:4px; font-size:2rem; text-shadow:0 0 10px var(--primary)">
+            // NEXUS ARCADE //</h2>
+        <div class="arcade-grid" id="arcade-grid"></div>
+        <button class="btn-small" style="margin-top:2rem; width:200px; color:var(--danger); border-color:var(--danger)"
+            onclick="document.getElementById('arcade-overlay').style.display='none'">EXIT ARCADE</button>
+    </div>
+
+    <!-- Active Game Stage -->
+    <div id="game-stage">
+        <div id="game-ui-layer">PRESS ESC TO EXIT</div>
+        <canvas id="game-canvas"></canvas>
+    </div>
+
+    <script>
+        /* =========================================
+           0. DIAGNOSTICS & TESTING (ALPHA)
+           ========================================= */
+        async function runDiagnostics() {
+            speak("Initiating Alpha Protocol. System Diagnostics engaged.");
+            const log = [];
+            const addLog = (msg, status) => log.push(`<div style="display:flex;justify-content:space-between;border-bottom:1px dashed #333;padding:5px;"><span>${msg}</span><span style="color:${status ? 'var(--success)' : 'var(--danger)'}">${status ? 'OK' : 'FAIL'}</span></div>`);
+
+            // 1. Core DOM Elements
+            const ids = ['cmd-input', 'timer', 'weather-temp', 'neural-canvas', 'game-canvas'];
+            ids.forEach(id => addLog(`Checking DOM Element: #${id}`, document.getElementById(id) !== null));
+
+            // 2. Local Storage
+            try {
+                localStorage.setItem('nexus_test', 'alpha');
+                const read = localStorage.getItem('nexus_test');
+                addLog('Storage R/W Access', read === 'alpha');
+                localStorage.removeItem('nexus_test');
+            } catch (e) { addLog('Storage R/W Access', false); }
+
+            // 3. Audio & Voice
+            addLog('Audio Context Supported', !!(window.AudioContext || window.webkitAudioContext));
+            addLog('Speech Recog. Supported', !!(window.SpeechRecognition || window.webkitSpeechRecognition));
+            addLog('Speech Synth. Supported', 'speechSynthesis' in window);
+
+            // 4. API Reachability (Simulated Ping)
+            addLog('CoinGecko API Check', (await fetch('https://api.coingecko.com/api/v3/ping').then(r => r.ok).catch(() => false)));
+            addLog('IPGeo API Check', (await fetch('https://ipapi.co/json/').then(r => r.ok).catch(() => false)));
+
+            // Report
+            const m = document.getElementById('modal-overlay');
+            m.style.display = 'flex';
+            document.getElementById('modal-content-area').innerHTML = `
+                <h2>ALPHA DIAGNOSTICS REPORT</h2>
+                <div style="font-family:monospace; margin:1rem 0; height:300px; overflow-y:auto; background:#111; padding:1rem; border:1px solid #333;">${log.join('')}</div>
+                <div style="color:var(--text-dim); font-size:0.8rem; text-align:center">End of Report. Review anomalies immediately.</div>
+                <button class="btn-small" style="width:100%; margin-top:1rem" onclick="closeModal()">CLOSE REPORT</button>
+            `;
+            speak("Diagnostics complete.");
+        }
+
+        /* =========================================
+           1. CORE LOGIC (Timer, Audio, Etc)
+           ========================================= */
+        // Timer Logic
+        let timerInt;
+        window.startTimer = (m) => {
+            if (!m || m <= 0) return;
+            clearInterval(timerInt);
+            let s = m * 60;
+            const tick = () => {
+                const min = Math.floor(s / 60);
+                const sec = (s % 60).toString().padStart(2, '0');
+                document.getElementById('timer').innerText = `${min}:${sec}`;
+                s--;
+                if (s < 0) {
+                    clearInterval(timerInt);
+                    speak("Focus session complete.");
+                }
+            };
+            tick();
+            timerInt = setInterval(tick, 1000);
+        };
+        window.resetTimer = () => { clearInterval(timerInt); document.getElementById('timer').innerText = "25:00"; };
+
+        // Audio Logic
+        let audioCtx, analyser, gainNode;
+        let audioEl = new Audio(); audioEl.crossOrigin = "anonymous";
+        let playlist = []; let currentTrackIndex = 0;
+
+        document.getElementById('audio-file-input').onchange = function (e) {
+            const files = Array.from(e.target.files);
+            playlist = playlist.concat(files);
+            renderPlaylist();
+            speak("Audio library updated.");
+        };
+
+        function renderPlaylist() {
+            const pl = document.getElementById('playlist');
+            pl.innerHTML = '';
+            playlist.forEach((file, i) => {
+                const d = document.createElement('div');
+                d.className = `track-item ${i === currentTrackIndex ? 'active' : ''}`;
+                d.innerHTML = `<span onclick="playTrack(${i})">${i + 1}. ${file.name}</span> <i class="fas fa-times track-rm" onclick="removeTrack(event, ${i})"></i>`;
+                pl.appendChild(d);
+            });
+        }
+
+        function removeTrack(e, i) {
+            e.stopPropagation();
+            playlist.splice(i, 1);
+            if (currentTrackIndex === i) {
+                audioEl.pause();
+                document.getElementById('play-icon').className = 'fas fa-play';
+                if (i < playlist.length) playTrack(i); // Try play next
+            } else if (currentTrackIndex > i) {
+                currentTrackIndex--;
+            }
+            renderPlaylist();
+        }
+
+        function playTrack(i) {
+            if (i < 0 || i >= playlist.length) return;
+            initAudio();
+            currentTrackIndex = i;
+            audioEl.src = URL.createObjectURL(playlist[i]);
+            audioEl.play();
+            renderPlaylist();
+            document.getElementById('play-icon').className = 'fas fa-pause';
+        }
+
+        function togglePlay() {
+            initAudio();
+            if (audioEl.paused && playlist.length > 0) {
+                if (!audioEl.src) playTrack(0);
+                else audioEl.play();
+                document.getElementById('play-icon').className = 'fas fa-pause';
+            } else {
+                audioEl.pause();
+                document.getElementById('play-icon').className = 'fas fa-play';
+            }
+        }
+
+        audioEl.onended = () => { if (currentTrackIndex < playlist.length - 1) playTrack(currentTrackIndex + 1); };
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                const src = audioCtx.createMediaElementSource(audioEl);
+                gainNode = audioCtx.createGain();
+                const bass = audioCtx.createBiquadFilter(); bass.type = 'lowshelf'; bass.freq = 200;
+                const mid = audioCtx.createBiquadFilter(); mid.type = 'peaking'; mid.freq = 1000;
+                src.connect(bass).connect(mid).connect(gainNode).connect(analyser).connect(audioCtx.destination);
+                window.setBass = v => bass.gain.value = v;
+                window.setMid = v => mid.gain.value = v;
+                window.setVolume = v => gainNode.gain.value = v;
+                drawViz();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function drawViz() {
+            const c = document.getElementById('visualizer-canvas');
+            const x = c.getContext('2d');
+            c.width = window.innerWidth; c.height = 120;
+            const b = new Uint8Array(analyser.frequencyBinCount);
+            function loop() {
+                requestAnimationFrame(loop);
+                analyser.getByteFrequencyData(b);
+                x.clearRect(0, 0, c.width, c.height);
+                const w = (c.width / b.length) * 2.5;
+                let px = 0;
+                for (let i = 0; i < b.length; i++) {
+                    x.fillStyle = getComputedStyle(document.body).getPropertyValue('--primary');
+                    x.fillRect(px, 0, w, b[i] / 2);
+                    px += w + 1;
+                }
+            }
+            loop();
+        }
+
+        /* =========================================
+           2. VOICE & COMMANDS
+           ========================================= */
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition;
+        let isListening = false;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false; // Changed to false for better one-shot command reliability
+            recognition.lang = 'en-US';
+
+            recognition.onstart = () => {
+                isListening = true;
+                const btn = document.getElementById('mic-btn');
+                btn.style.color = 'var(--danger)';
+                btn.classList.add('fa-beat');
+                document.getElementById('voice-status').style.display = 'block';
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                const btn = document.getElementById('mic-btn');
+                btn.style.color = 'var(--text-dim)';
+                btn.classList.remove('fa-beat');
+                document.getElementById('voice-status').style.display = 'none';
+            };
+
+            recognition.onresult = (e) => {
+                const t = e.results[e.results.length - 1][0].transcript.toLowerCase().trim();
+                console.log("Heard:", t);
+                document.getElementById('cmd-input').value = t;
+                processCmd(t);
+            };
+
+            recognition.onerror = (e) => {
+                console.error("Speech Error:", e.error);
+                isListening = false;
+                const btn = document.getElementById('mic-btn');
+                btn.classList.remove('fa-beat');
+            };
+        }
+
+        function toggleVoice() {
+            if (!recognition) { alert("Voice control not supported in this browser."); return; }
+            if (isListening) recognition.stop();
+            else recognition.start();
+        }
+
+        function speak(t) { const u = new SpeechSynthesisUtterance(t); u.rate = 1.1; window.speechSynthesis.speak(u); }
+
+        window.openHelp = () => {
+            const m = document.getElementById('modal-overlay');
+            document.getElementById('modal-content-area').innerHTML = `<h2>COMMAND PROTOCOLS</h2>
+            <ul style="color:var(--text-main); font-family:monospace; line-height:1.8">
+                <li><b>/help</b> - View this list</li>
+                <li><b>/game</b> - Launch Hacker Typer</li>
+                <li><b>VOICE:</b> "Hey Nexus, play music"</li>
+                <li><b>VOICE:</b> "Hey Nexus, open projects"</li>
+                <li><b>VOICE:</b> "Hey Nexus, backup system"</li>
+                <li><b>CHAT:</b> Type any question to chat with Nexus</li>
+            </ul>
+            <button class="btn-small" style="width:100%; margin-top:1rem" onclick="closeModal()">CLOSE</button>`;
+            m.style.display = 'flex';
+        }
+
+        /* =========================================
+           3. WIDGETS (Kanban, Metrics, Chroma)
+           ========================================= */
+        // Metrics Graph
+        const rc = document.getElementById('res-canvas');
+        const rctx = rc.getContext('2d');
+        let resData = new Array(50).fill(10);
+        function drawRes() {
+            rc.width = rc.offsetWidth; rc.height = rc.offsetHeight;
+            resData.push(Math.random() * 50 + 20); resData.shift();
+            rctx.clearRect(0, 0, rc.width, rc.height);
+            rctx.beginPath();
+            rctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--primary');
+            rctx.moveTo(0, rc.height - resData[0]);
+            for (let i = 1; i < resData.length; i++) {
+                rctx.lineTo((i / resData.length) * rc.width, rc.height - resData[i]);
+            }
+            rctx.stroke();
+            document.getElementById('cpu-val').innerText = Math.floor(resData[resData.length - 1]) + "%";
+            requestAnimationFrame(drawRes);
+        }
+        drawRes();
+
+        // Widget Config
+        let widgets = JSON.parse(localStorage.getItem('nexus_widgets_v2')) || { weather: true, focus: true, audio: true, ticker: true, metrics: true };
+        function applyWidgets() {
+            document.getElementById('widget-weather').style.display = widgets.weather ? 'block' : 'none';
+            document.getElementById('widget-focus').style.display = widgets.focus ? 'block' : 'none';
+            document.getElementById('widget-audio').style.display = widgets.audio ? 'block' : 'none';
+            document.getElementById('widget-ticker').style.display = widgets.ticker ? 'flex' : 'none';
+            document.getElementById('widget-metrics').style.display = widgets.metrics ? 'block' : 'none';
+        }
+        applyWidgets();
+
+        // Chroma & App Store (Backup Added)
+        window.openAppStore = () => {
+            const m = document.getElementById('modal-overlay');
+            m.style.display = 'flex';
+            document.getElementById('modal-content-area').innerHTML = `
+                <h2>SYSTEM CONFIG</h2>
+                <div style="margin-bottom:1rem;">
+                    <label>CHROMA CONFIG:</label>
+                    <input type="color" onchange="document.documentElement.style.setProperty('--primary', this.value); localStorage.setItem('nexus_chroma', this.value)" style="width:100%; height:40px; margin-top:5px; border:none; cursor:pointer;" value="${getComputedStyle(document.documentElement).getPropertyValue('--primary').trim()}">
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:1rem">
+                     <button class="btn-small" onclick="widgets.metrics=!widgets.metrics; saveW();">TOGGLE METRICS</button>
+                     <button class="btn-small" onclick="widgets.weather=!widgets.weather; saveW();">TOGGLE WEATHER</button>
+                     <button class="btn-small" onclick="widgets.audio=!widgets.audio; saveW();">TOGGLE AUDIO</button>
+                     <button class="btn-small" onclick="downloadBackup()">BACKUP DATA</button>
+                </div>
+                <div style="border-top:1px solid #333; padding-top:1rem">
+                    <button class="btn-small" onclick="document.getElementById('file-bkup').click()">RESTORE DATA</button>
+                    <input type="file" id="file-bkup" style="display:none" onchange="restoreBackup(this)">
+                </div>
+                <button class="btn-small" style="margin-top:1rem; width:100%; border-color:var(--danger); color:var(--danger)" onclick="closeModal()">CLOSE</button>
+             `;
+        };
+        const saveW = () => { localStorage.setItem('nexus_widgets_v2', JSON.stringify(widgets)); applyWidgets(); openAppStore(); };
+
+        // Restore Chroma
+        const savedColor = localStorage.getItem('nexus_chroma');
+        if (savedColor) document.documentElement.style.setProperty('--primary', savedColor);
+
+        // KANBAN PROJECT BOARD
+        let projects = JSON.parse(localStorage.getItem('nexus_projects')) || [
+            { id: 1, txt: "Initialize Nexus", status: "done" },
+            { id: 2, txt: "System Audit", status: "todo" }
+        ];
+        window.openKanban = () => {
+            const m = document.getElementById('modal-overlay');
+            m.style.display = 'flex';
+            renderKanban();
+        };
+
+        function renderKanban() {
+            const c = document.getElementById('modal-content-area');
+            const cols = { todo: "", prog: "", done: "" };
+            projects.forEach(p => {
+                let next = p.status === 'todo' ? 'prog' : (p.status === 'prog' ? 'done' : 'todo');
+                cols[p.status] += `<div class="k-task" onclick="moveTask(${p.id}, '${next}')">${p.txt} <i class="fas fa-trash k-del" onclick="deleteTask(event, ${p.id})"></i></div>`;
+            });
+
+            c.innerHTML = `
+                <h2>PROJECT PROTOCOL</h2>
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <input id="new-task-in" type="text" placeholder="New Task..." style="flex:1; padding:5px; background:#111; color:#fff; border:1px solid #444">
+                    <button class="btn-small" onclick="addTask()">ADD</button>
+                </div>
+                <div class="kanban-board">
+                    <div class="kanban-col"><h4>TODO</h4>${cols.todo}</div>
+                    <div class="kanban-col"><h4>IN PROGRESS</h4>${cols.prog}</div>
+                    <div class="kanban-col"><h4>DONE</h4>${cols.done}</div>
+                </div>
+                <button class="btn-small" style="width:100%; margin-top:1rem" onclick="closeModal()">CLOSE</button>
+            `;
+        }
+        window.addTask = () => { const txt = document.getElementById('new-task-in').value; if (txt) { projects.push({ id: Date.now(), txt: txt, status: 'todo' }); saveProj(); renderKanban(); } };
+        window.moveTask = (id, next) => { const t = projects.find(p => p.id === id); if (t) t.status = next; saveProj(); renderKanban(); };
+        window.deleteTask = (e, id) => { e.stopPropagation(); projects = projects.filter(p => p.id !== id); saveProj(); renderKanban(); };
+        const saveProj = () => localStorage.setItem('nexus_projects', JSON.stringify(projects));
+        window.closeModal = () => document.getElementById('modal-overlay').style.display = 'none';
+
+        /* =========================================
+           4. PHASE 6: ARCHITECT UTILS
+           ========================================= */
+        // 4.1 Draggable Memory
+        const mem = document.getElementById('memory-core');
+        let isDragging = false, startX, startY, initialLeft, initialTop;
+
+        // Restore pos
+        const savedPos = JSON.parse(localStorage.getItem('nexus_mem_pos'));
+        if (savedPos) { mem.style.left = savedPos.left; mem.style.top = savedPos.top; mem.style.right = 'auto'; }
+
+        mem.addEventListener('mousedown', (e) => {
+            if (e.target.tagName === 'TEXTAREA') return; // Allow typing
+            isDragging = true;
+            startX = e.clientX; startY = e.clientY;
+            initialLeft = mem.offsetLeft; initialTop = mem.offsetTop;
+            mem.style.cursor = 'grabbing';
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - startX; const dy = e.clientY - startY;
+            mem.style.left = `${initialLeft + dx}px`;
+            mem.style.top = `${initialTop + dy}px`;
+            mem.style.right = 'auto'; // Disable initial right alignment
+        });
+        window.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false; men.style.cursor = 'grab';
+                localStorage.setItem('nexus_mem_pos', JSON.stringify({ left: mem.style.left, top: mem.style.top }));
+            }
+        });
+
+        // 4.2 Nexus Link (Backup/Restore)
+        window.downloadBackup = () => {
+            const data = {
+                widgets: localStorage.getItem('nexus_widgets_v2'),
+                links: localStorage.getItem('nexus_links'),
+                chroma: localStorage.getItem('nexus_chroma'),
+                projects: localStorage.getItem('nexus_projects'),
+                memory: document.getElementById('memory-content').value,
+                memPos: localStorage.getItem('nexus_mem_pos')
+            };
+            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'nexus_core_backup.json';
+            a.click();
+            speak("System data exported.");
+        };
+
+        window.restoreBackup = (input) => {
+            const file = input.files[0];
+            if (!file) return;
+            const r = new FileReader();
+            r.onload = (e) => {
+                const data = JSON.parse(e.target.result);
+                if (data.widgets) localStorage.setItem('nexus_widgets_v2', data.widgets);
+                if (data.links) localStorage.setItem('nexus_links', data.links);
+                if (data.chroma) localStorage.setItem('nexus_chroma', data.chroma);
+                if (data.projects) localStorage.setItem('nexus_projects', data.projects);
+                if (data.memPos) localStorage.setItem('nexus_mem_pos', data.memPos);
+                alert("System restored. Rebooting...");
+                location.reload();
+            };
+            r.readAsText(file);
+        };
+
+        // 4.3 Holo-Tilt UI (REMOVED)
+        // Previous tilt logic removed as per user request to stop "floating" effect.
+
+        // Weather Logic (Fixed)
+        async function updateWeather() {
+            try {
+                const locRep = await fetch('https://ipapi.co/json/');
+                const locData = await locRep.json();
+                const lat = locData.latitude; const lon = locData.longitude;
+                document.getElementById('weather-loc').innerText = `${locData.city}, ${locData.country_code}`;
+
+                const wRep = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+                const wData = await wRep.json();
+                document.getElementById('weather-temp').innerText = `${Math.round(wData.current_weather.temperature)}°C`;
+
+                const code = wData.current_weather.weathercode;
+                let desc = "CLEAR";
+                if (code > 3) desc = "CLOUDY";
+                if (code > 50) desc = "RAIN";
+                if (code > 70) desc = "SNOW";
+                if (code > 90) desc = "STORM";
+                document.getElementById('weather-desc').innerText = desc;
+            } catch (e) {
+                console.error(e);
+                document.getElementById('weather-desc').innerText = "OFFLINE";
+            }
+        }
+        updateWeather(); setInterval(updateWeather, 600000);
+
+        // 4.4 Terminal Chat & Unified Command Processor (100+ Commands)
+        window.execCmd = (cmd) => {
+            document.getElementById('cmd-input').value = cmd;
+            processCmd(cmd);
+        };
+
+        function processCmd(val) {
+            val = val.toLowerCase().trim();
+            if (!val) return;
+
+            // --- 1. CORE SHORTCUTS ---
+            if (val.startsWith('/')) {
+                if (val.includes('/game') || val.includes('/arcade')) { openArcade(); return; }
+                if (val.includes('/help')) { openHelp(); return; }
+                if (val.startsWith('/g ')) { window.open('https://google.com/search?q=' + val.substring(3)); return; }
+                if (val.startsWith('/y ')) { window.open('https://youtube.com/results?search_query=' + val.substring(3)); return; }
+                window.open('https://google.com/search?q=' + val.substring(1)); return;
+            }
+
+            // --- 2. SYSTEM COMMANDS ---
+            const sysCmds = {
+                'reload': () => { speak("Rebooting system."); setTimeout(() => location.reload(), 1000); },
+                'reboot': () => { speak("Rebooting system."); setTimeout(() => location.reload(), 1000); },
+                'shutdown': () => { speak("System shutdown initiated."); document.body.style.filter = 'brightness(0)'; },
+                'sleep': () => { speak("Entering sleep mode."); document.body.style.opacity = '0.1'; },
+                'wake': () => { speak("System active."); document.body.style.opacity = '1'; document.body.style.filter = 'brightness(1)'; },
+                'clear': () => { document.getElementById('cmd-input').value = ''; speak("Terminal cleared."); },
+                'date': () => speak("Current date is " + new Date().toLocaleDateString()),
+                'time': () => speak("Current time is " + new Date().toLocaleTimeString()),
+                'version': () => speak("Nexus Operating System v9.0. Architect Build."),
+                'uptime': () => speak("System has been running for " + Math.floor(performance.now() / 60000) + " minutes."),
+                'fullscreen': () => { !document.fullscreenElement ? document.documentElement.requestFullscreen() : document.exitFullscreen(); },
+                'exit': () => { if (document.fullscreenElement) document.exitFullscreen(); },
+                'mute': () => { setVolume(0); document.querySelectorAll('input[type=range]')[2].value = 0; speak("Audio muted."); },
+                'unmute': () => { setVolume(0.5); document.querySelectorAll('input[type=range]')[2].value = 0.5; speak("Audio restored."); },
+                'lock': () => { speak("System locked."); document.body.innerHTML = '<h1 style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:red;">SYSTEM LOCKED</h1>'; }
+            };
+            if (sysCmds[val]) { sysCmds[val](); return; }
+
+            // --- 3. NAVIGATION & APPS ---
+            if (val.includes('project')) { openKanban(); return; }
+            if (val.includes('backup')) { downloadBackup(); return; }
+            if (val.includes('restore')) { document.getElementById('file-bkup').click(); return; }
+            if (val.includes('module') || val.includes('config')) { openAppStore(); return; }
+            if (val.includes('play') || val.includes('pause') || val.includes('stop')) { togglePlay(); return; }
+            if (val.includes('timer')) { const num = val.match(/\d+/); if (num) startTimer(parseInt(num[0])); return; }
+
+            const apps = {
+                'arcade': openArcade, 'game': openArcade, 'games': openArcade,
+                'calculator': () => window.open('https://www.google.com/search?q=calculator'),
+                'weather': () => speak(`Current temperature is ${document.getElementById('weather-temp').innerText}`),
+                'notepad': () => { const w = window.open('', '_blank', 'width=400,height=400'); w.document.write('<textarea style="width:100%;height:100%"></textarea>'); },
+                'maps': () => window.open('https://maps.google.com'),
+                'mail': () => window.open('mailto:'),
+                'music': () => document.getElementById('audio-file-input').click(),
+                'code': () => window.open('https://github.com'),
+                'terminal': () => speak("You are already in the terminal."),
+                'files': () => speak("Accessing local file system..."),
+                'browser': () => window.open('https://google.com')
+            };
+            if (apps[val]) { apps[val](); return; }
+
+            // --- 4. WEB LINKS (SOCIALS) ---
+            const links = {
+                'google': 'https://google.com', 'youtube': 'https://youtube.com', 'github': 'https://github.com',
+                'twitter': 'https://twitter.com', 'x': 'https://twitter.com', 'instagram': 'https://instagram.com',
+                'facebook': 'https://facebook.com', 'reddit': 'https://reddit.com', 'netflix': 'https://netflix.com',
+                'spotify': 'https://open.spotify.com', 'amazon': 'https://amazon.com', 'discord': 'https://discord.com',
+                'twitch': 'https://twitch.tv', 'linkedin': 'https://linkedin.com', 'chatgpt': 'https://chat.openai.com',
+                'stackoverflow': 'https://stackoverflow.com', 'wikipedia': 'https://wikipedia.org'
+            };
+            if (links[val]) { window.open(links[val]); speak(`Opening ${val}.`); return; }
+
+            // --- 5. THEMING ---
+            if (val.startsWith('theme ') || val.includes('mode')) {
+                const color = val.replace('theme ', '').replace(' mode', '');
+                const colors = { 'red': '#ff0055', 'blue': '#00f0ff', 'green': '#00ff88', 'purple': '#7000ff', 'orange': '#ffaa00', 'yellow': '#ffee00', 'cyan': '#00ffff', 'white': '#ffffff', 'pink': '#ff00ff', 'black': '#333333' };
+                if (colors[color] || color === 'dark' || color === 'light') {
+                    const c = colors[color] || (color === 'dark' ? '#00f0ff' : '#000000');
+                    document.documentElement.style.setProperty('--primary', c);
+                    localStorage.setItem('nexus_chroma', c);
+                    speak(`Theme set to ${color}.`);
+                    return;
+                }
+            }
+            if (val === 'matrix') { document.documentElement.style.setProperty('--primary', '#00ff00'); speak("Entering the Matrix."); return; }
+
+            // --- 6. SIMULATIONS & NETWORK ---
+            const sim = {
+                'ping': "Pinging server... 1ms. Connectivity: Optimal.",
+                'ipconfig': "IPv4: 192.168.1.X // Subnet: 255.255.255.0",
+                'status': "Systems Nominal. CPU: Stable. RAM: Optimal.",
+                'scan': "Scanning sector... No threats detected.",
+                'hack': "Accessing mainframe... Bypassing firewall... Access Granted.",
+                'trace': "Tracing signal... Origin: [REDACTED].",
+                'encrypt': "Data encryption sequence initiated... Done.",
+                'decrypt': "Decryption complete. Data is secure.",
+                'sudo': "User is Administrator. Access granted.",
+                'root': "Root access enabled.",
+                'log': "System Log: No errors found today.",
+                'diagnostic': "Running diagnostic... All hardware functional."
+            };
+            if (sim[val]) { showResponse(val, sim[val]); return; }
+
+            // --- 6.5 DIAGNOSTICS ---
+            if (val === 'test' || val === 'alpha' || val === 'verify') { runDiagnostics(); return; }
+
+            // --- 7. FUN & EASTER EGGS ---
+            const fun = {
+                'hello': "Greetings, user.", 'hi': "Hello there.",
+                'joke': "Why do Java developers wear glasses? Because they don't C#.",
+                'quote': "The only way to do great work is to love what you do.",
+                'roll': "Doing a barrel roll...",
+                'spin': "Spinning up...",
+                'dance': "I am a robot, I cannot dance. Yet.",
+                'party': "Party mode engaged!",
+                '42': "The answer to life, the universe, and everything.",
+                'coffee': "I cannot brew coffee, but I can keep you awake.",
+                'cat': "Meow.", 'dog': "Woof.",
+                'magic': "Abra Cadabra!",
+                'force': "May the force be with you."
+            };
+            if (fun[val]) {
+                if (val === 'roll' || val === 'spin') document.body.style.transform = 'rotate(360deg)';
+                setTimeout(() => document.body.style.transform = 'none', 1000);
+                showResponse(val, fun[val]);
+                return;
+            }
+
+            // --- DEFAULT CHAT FALLBACK ---
+            showResponse(val, "Command not recognized. Analyzing as natural language query...");
+        }
+
+        function showResponse(cmd, reply) {
+            speak(reply);
+            const h = document.getElementById('modal-overlay');
+            document.getElementById('modal-content-area').innerHTML = `<h2>NEXUS CORE</h2><p style="font-family:monospace; line-height:1.5; color:var(--text-main)">>> ${cmd}<br><br><span style="color:var(--primary)">NEXUS: ${reply}</span></p><button class="btn-small" style="width:100%; margin-top:1rem" onclick="closeModal()">CLOSE</button>`;
+            h.style.display = 'flex';
+        }
+
+        /* =========================================
+           5. GAME CENTER V2 (10 LEVELS)
+           ========================================= */
+        const games = [
+            { id: 'matrix', name: 'Hacker Typer', icon: 'fa-user-secret' },
+            { id: 'snake', name: 'Neon Snake', icon: 'fa-staff-snake' },
+            { id: 'pong', name: 'Cyber Pong', icon: 'fa-table-tennis-paddle-ball' },
+            { id: 'breakout', name: 'Breakout', icon: 'fa-cubes' },
+            { id: 'tetris', name: 'Tetris Block', icon: 'fa-shapes' }
+        ];
+
+        function openArcade() {
+            const g = document.getElementById('arcade-grid');
+            g.innerHTML = '';
+            games.forEach(game => {
+                const d = document.createElement('div');
+                d.className = 'game-card';
+                d.innerHTML = `<i class="fas ${game.icon}"></i><h4>${game.name}</h4>`;
+                d.onclick = () => launchGame(game.id);
+                g.appendChild(d);
+            });
+            document.getElementById('arcade-overlay').style.display = 'flex';
+        }
+
+        let gameLoop, gameActive = false;
+        const gc = document.getElementById('game-canvas');
+        const gx = gc.getContext('2d');
+
+        // GAME STATE V2
+        let level = 1;
+        let score = 0;
+        let timer = 0;
+        let speed = 1;
+        let gameId = '';
+
+        function launchGame(id) {
+            document.getElementById('game-stage').style.display = 'block';
+            gc.width = window.innerWidth; gc.height = window.innerHeight;
+            gameActive = true;
+            gameId = id;
+            level = 1; score = 0; speed = 1;
+            updateUI();
+
+            if (id === 'matrix') startMatrix();
+            if (id === 'snake') startSnake();
+            if (id === 'pong') startPong();
+            if (id === 'breakout') startBreakout();
+            if (id === 'tetris') startTetris();
+        }
+
+        function updateUI() {
+            document.getElementById('game-ui-layer').innerHTML = `GAME: ${gameId.toUpperCase()} | LEVEL: ${level}/10 | SCORE: ${score} | [ESC] EXIT`;
+            if (level > 10) {
+                gameActive = false; clearInterval(gameLoop);
+                document.getElementById('game-ui-layer').innerHTML = `VICTORY! ALL LEVELS COMPLETE. SCORE: ${score} | [ESC] EXIT`;
+                speak("Victory achieved. Simulation complete.");
+            }
+        }
+
+        function checkLevelUp(threshold) {
+            if (score >= threshold * level) {
+                level++;
+                speed += 0.2;
+                speak(`Level ${level} initiated.`);
+                return true;
+            }
+            return false;
+        }
+
+        function stopGame() {
+            gameActive = false;
+            clearInterval(gameLoop);
+            document.getElementById('game-stage').style.display = 'none';
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && gameActive) stopGame();
+        });
+
+        // --- GAME ENGINES (REPAIRED & ITEMIZED) ---
+
+        function startMatrix() { // Hacker Typer V2
+            const cols = Math.floor(gc.width / 20);
+            const ypos = Array(cols).fill(0);
+            gameLoop = setInterval(() => {
+                gx.fillStyle = 'rgba(0,0,0,0.05)'; gx.fillRect(0, 0, gc.width, gc.height);
+                gx.fillStyle = '#0f0'; gx.font = '15px monospace';
+                ypos.forEach((y, i) => {
+                    const text = String.fromCharCode(Math.random() * 128);
+                    gx.fillText(text, i * 20, y);
+                    if (y > gc.height && Math.random() > 0.975) ypos[i] = 0;
+                    ypos[i] += 20;
+                });
+                score++;
+                if (score % 100 === 0) { level++; updateUI(); } // Auto level up every 100 ticks
+                updateUI();
+            }, 50 - (level * 2));
+        }
+
+        function startSnake() { // Snake V2
+            let snk = [{ x: 10, y: 10 }], dir = { x: 1, y: 0 }, food = { x: 15, y: 15 };
+            const sz = 20;
+            document.onkeydown = e => {
+                if (e.key === 'ArrowUp' && dir.y !== 1) dir = { x: 0, y: -1 };
+                if (e.key === 'ArrowDown' && dir.y !== -1) dir = { x: 0, y: 1 };
+                if (e.key === 'ArrowLeft' && dir.x !== 1) dir = { x: -1, y: 0 };
+                if (e.key === 'ArrowRight' && dir.x !== -1) dir = { x: 1, y: 0 };
+                if (e.key === 'Escape') stopGame();
+            };
+
+            const run = () => {
+                if (!gameActive) return;
+                let head = { x: snk[0].x + dir.x, y: snk[0].y + dir.y };
+
+                // Wall Collision
+                if (head.x < 0 || head.y < 0 || head.x > (gc.width / sz) || head.y > (gc.height / sz)) {
+                    speak("Game Over"); stopGame(); return;
+                }
+                // Self Collision
+                for (let s of snk) if (head.x === s.x && head.y === s.y) { speak("Game Over"); stopGame(); return; }
+
+                snk.unshift(head);
+                if (Math.abs(head.x - food.x) < 1 && Math.abs(head.y - food.y) < 1) {
+                    score += 10;
+                    food = { x: Math.floor(Math.random() * (gc.width / sz)), y: Math.floor(Math.random() * (gc.height / sz)) };
+                    if (checkLevelUp(50)) clearInterval(gameLoop); // Restart loop with new speed handled below
+                } else snk.pop();
+
+                gx.fillStyle = '#000'; gx.fillRect(0, 0, gc.width, gc.height);
+                gx.fillStyle = '#0f0'; snk.forEach(s => gx.fillRect(s.x * sz, s.y * sz, sz - 2, sz - 2));
+                gx.fillStyle = '#f00'; gx.fillRect(food.x * sz, food.y * sz, sz, sz);
+                updateUI();
+
+                setTimeout(run, 100 - (level * 8)); // Recursive timeout for variable speed
+            };
+            run();
+        }
+
+        function startPong() { // Pong V2 (Auto-Level)
+            let ball = { x: gc.width / 2, y: gc.height / 2, dx: 5, dy: 5, r: 10 };
+            let p1 = { y: gc.height / 2, h: 100 }, p2 = { y: gc.height / 2, h: 100 };
+            gc.addEventListener('mousemove', e => p1.y = e.clientY - 50);
+
+            gameLoop = setInterval(() => {
+                gx.fillStyle = '#000'; gx.fillRect(0, 0, gc.width, gc.height);
+                ball.x += (ball.dx * (1 + level * 0.1));
+                ball.y += (ball.dy * (1 + level * 0.1));
+
+                // AI Tracking (Imperfect based on level)
+                let target = ball.y - 50;
+                let aiSpeed = 3 + level;
+                if (p2.y < target) p2.y += aiSpeed; else p2.y -= aiSpeed;
+
+                // Bounce Y
+                if (ball.y < 0 || ball.y > gc.height) ball.dy *= -1;
+
+                // Paddles
+                if (ball.x < 30 && ball.y > p1.y && ball.y < p1.y + 100) { ball.dx = Math.abs(ball.dx); score += 10; checkLevelUp(30); speak("Hit"); }
+                if (ball.x > gc.width - 30 && ball.y > p2.y && ball.y < p2.y + 100) ball.dx = -Math.abs(ball.dx);
+
+                // Reset
+                if (ball.x < 0) { speak("You missed."); stopGame(); }
+                if (ball.x > gc.width) { ball.x = gc.width / 2; ball.y = gc.height / 2; score += 50; speak("Point."); }
+
+                gx.fillStyle = '#fff';
+                gx.fillRect(10, p1.y, 20, p1.h);
+                gx.fillRect(gc.width - 30, p2.y, 20, p2.h);
+                gx.beginPath(); gx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2); gx.fill();
+                updateUI();
+            }, 16);
+        }
+
+        function startBreakout() { // Breakout V2
+            let ball = { x: gc.width / 2, y: gc.height - 30, dx: 4, dy: -4, r: 8 };
+            let pad = { x: gc.width / 2, w: 100, h: 10 };
+            let bricks = [];
+
+            const initBricks = () => {
+                bricks = [];
+                for (let c = 0; c < 8; c++) for (let r = 0; r < 3 + level; r++) bricks.push({ x: c * 100 + 100, y: r * 30 + 50, status: 1 });
+            };
+            initBricks();
+
+            document.onmousemove = e => pad.x = e.clientX - pad.w / 2;
+
+            gameLoop = setInterval(() => {
+                gx.fillStyle = '#000'; gx.fillRect(0, 0, gc.width, gc.height);
+
+                bricks.forEach(b => {
+                    if (b.status) {
+                        gx.fillStyle = `hsl(${b.y}, 100%, 50%)`;
+                        gx.fillRect(b.x, b.y, 90, 20);
+                        if (ball.x > b.x && ball.x < b.x + 90 && ball.y > b.y && ball.y < b.y + 20) {
+                            ball.dy *= -1; b.status = 0; score += 10;
+                            if (bricks.every(k => !k.status)) { level++; speak("Sector cleared."); initBricks(); ball.y = gc.height - 100; ball.dy = -4; }
+                        }
+                    }
+                });
+
+                ball.x += ball.dx * (1 + level * 0.1);
+                ball.y += ball.dy * (1 + level * 0.1);
+
+                if (ball.x > gc.width || ball.x < 0) ball.dx *= -1;
+                if (ball.y < 0) ball.dy *= -1;
+                else if (ball.y > gc.height) { speak("Ball lost."); stopGame(); }
+
+                // Paddle
+                if (ball.y + 10 > gc.height - 20 && ball.x > pad.x && ball.x < pad.x + pad.w) ball.dy = -Math.abs(ball.dy);
+
+                gx.fillStyle = '#fff'; gx.beginPath(); gx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2); gx.fill();
+                gx.fillRect(pad.x, gc.height - 20, pad.w, pad.h);
+                updateUI();
+            }, 16);
+        }
+
+        function startTetris() { // Basic Block Drop V2
+            let y = 0, x = Math.floor(gc.width / 2);
+            gameLoop = setInterval(() => {
+                gx.fillStyle = '#000'; gx.fillRect(0, 0, gc.width, gc.height);
+                gx.fillStyle = '#00f0ff'; gx.fillRect(x, y, 40, 40);
+                y += 5 * level;
+                if (y > gc.height) { y = 0; x = Math.random() * gc.width; score += 10; checkLevelUp(50); }
+                updateUI();
+            }, 30);
+        }
+
+        /* =========================================
+           6. THREE.JS STARFIELD BACKGROUND (WARP DRIVE)
+           ========================================= */
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('neural-canvas'), alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        const starGeo = new THREE.BufferGeometry();
+        const starCount = 6000;
+        const posArray = new Float32Array(starCount * 3);
+
+        for (let i = 0; i < starCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 2000; // Spread stars far out
+        }
+
+        starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.7 });
+        const starMesh = new THREE.Points(starGeo, starMat);
+        scene.add(starMesh);
+
+        camera.position.z = 1;
+
+        let mouseX = 0, mouseY = 0;
+        document.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX - window.innerWidth / 2) * 0.05;
+            mouseY = (e.clientY - window.innerHeight / 2) * 0.05;
+        });
+
+        function animateStars() {
+            requestAnimationFrame(animateStars);
+            const positions = starGeo.attributes.position.array;
+
+            for (let i = 0; i < starCount; i++) {
+                const i3 = i * 3;
+                positions[i3 + 2] += 2; // Move stars towards camera (Z-axis)
+
+                if (positions[i3 + 2] > 200) {
+                    positions[i3 + 2] = -1000; // Reset star back
+                    positions[i3] = (Math.random() - 0.5) * 2000; // Random X
+                    positions[i3 + 1] = (Math.random() - 0.5) * 2000; // Random Y
+                }
+            }
+            starGeo.attributes.position.needsUpdate = true;
+
+            // Subtle camera movement based on mouse
+            camera.rotation.x += (mouseY * 0.0001 - camera.rotation.x) * 0.05;
+            camera.rotation.y += (mouseX * 0.0001 - camera.rotation.y) * 0.05;
+
+            renderer.render(scene, camera);
+        }
+        animateStars();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        /* =========================================
+           7. RESPONSE SYSTEM (TYPING LOG)
+           ========================================= */
+        function typeLog(text) {
+            const el = document.getElementById('log-text');
+            if (!el) return;
+            el.innerText = '';
+            let i = 0;
+            const type = () => {
+                if (i < text.length) {
+                    el.innerText += text.charAt(i);
+                    i++;
+                    setTimeout(type, 30);
+                } else {
+                    setTimeout(() => { if (el.innerText === text) el.innerText = ''; }, 4000);
+                }
+            };
+            type();
+        }
+
+        // Initialize
+        document.getElementById('cmd-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const val = e.target.value;
+                processCmd(val);
+                e.target.value = '';
+            }
+        });
+
+        // Ensure input is accessible
+        document.getElementById('cmd-input').addEventListener('focus', () => {
+            document.getElementById('sys-log').style.zIndex = -1;
+        });
+        document.getElementById('cmd-input').addEventListener('blur', () => {
+            document.getElementById('sys-log').style.zIndex = 90;
+        });
+
+        // Override standard speak to include visual log
+        const _speak = speak;
+        window.speak = (t) => { _speak(t); typeLog(t); };
+
+        // Override showResponse for simpler output
+        window.showResponse = (cmd, reply) => {
+            speak(reply);
+            if (reply.length > 100) {
+                const h = document.getElementById('modal-overlay');
+                document.getElementById('modal-content-area').innerHTML = `<h2>NEXUS CORE</h2>
+                <p style="font-family:monospace; line-height:1.5; color:var(--text-main)">>> ${cmd}<br><br>
+                <span style="color:var(--primary)">NEXUS: ${reply}</span></p>
+                <button class="btn-small" style="width:100%; margin-top:1rem" onclick="closeModal()">CLOSE</button>`;
+                h.style.display = 'flex';
+            }
+        };
+
+        // Standard Utils
+        function upt() {
+            const d = new Date();
+            const time = d.toLocaleTimeString('en-US', { hour12: false });
+            const date = d.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+            document.getElementById('clock').innerHTML = `${time}<div style="font-size:0.4em; letter-spacing:2px; color:var(--text-dim); margin-top:5px;">${date.toUpperCase()}</div>`;
+        }
+        setInterval(upt, 1000);
+        upt();
+
+        // Persistent To-Do List
+        const todoState = JSON.parse(localStorage.getItem('nexus_todo') || '[]');
+        function renderTodo() {
+            const el = document.getElementById('todo-list');
+            if (!el) return;
+            el.innerHTML = todoState.map((t, i) => `<div onclick="toggleTodo(${i})" style="cursor:pointer; opacity:${t.done ? 0.5 : 1}; text-decoration:${t.done ? 'line-through' : 'none'}">› ${t.text}</div>`).join('');
+            localStorage.setItem('nexus_todo', JSON.stringify(todoState));
+        }
+        window.addTodo = () => {
+            const t = prompt("Enter Task Protocol:");
+            if (t) { todoState.push({ text: t, done: false }); renderTodo(); }
+        };
+        window.toggleTodo = (i) => {
+            todoState[i].done = !todoState[i].done;
+            if (confirm("Delete completed task?")) todoState.splice(i, 1);
+            renderTodo();
+        }
+
+        async function tick() {
+            try {
+                const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true');
+                const d = await r.json();
+                let h = '';
+                for (let k in d) {
+                    h += `<span class="ticker-item">${k.toUpperCase()} $${d[k].usd}</span>`;
+                }
+                document.getElementById('ticker-content').innerHTML = h + h;
+            } catch (e) { console.error("Ticker fetch error", e); }
+        }
+        tick();
+
+        // Initial Render
+        renderTodo();
+    </script>
+</body>
+
+</html>
